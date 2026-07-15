@@ -447,14 +447,14 @@ class _FeedScreenState extends State<FeedScreen> {
           // Caption
           if (post['caption'] != null && post['caption'].toString().isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, bottom: 10),
+              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 10),
               child: Text(post['caption'], style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textBrown)),
             ),
 
           // Attached cat card
           if (cat != null) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, bottom: 12),
+              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
@@ -639,8 +639,7 @@ class _FeedScreenState extends State<FeedScreen> {
               if (_taggedFriends.isNotEmpty)
                 Wrap(
                   spacing: 6,
-                  children: _taggedFriends.map((f) => Chip(
-                    dense: true,
+                  children: _taggedFriends.map<Widget>((f) => Chip(
                     label: Text('@${f['username']}', style: GoogleFonts.nunito(fontSize: 10, color: AppColors.primaryGreen)),
                     backgroundColor: AppColors.lightGreen,
                     onDeleted: () => setModalState(() => _taggedFriends.remove(f)),
