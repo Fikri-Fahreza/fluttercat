@@ -27,7 +27,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   String get _token => context.read<AuthProvider>().token ?? '';
-  Options get _authOptions => Options(headers: {'Authorization': 'Bearer $_token'});
+  Options get _authOptions => Options(headers: {'Authorization': 'Bearer $_token', 'Accept': 'application/json'});
 
   Future<void> _fetchLeaderboard() async {
     try {
@@ -61,6 +61,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    int myRankNum = int.tryParse(_myRank?['rank']?.toString() ?? '') ?? 0;
+    int myScore = int.tryParse(_myRank?['total_score']?.toString() ?? '') ?? 0;
+    int myCats = int.tryParse(_myRank?['cats_count']?.toString() ?? '') ?? 0;
+
     return Scaffold(
       backgroundColor: AppColors.bgCream,
       appBar: AppBar(
@@ -90,7 +94,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     color: AppColors.primaryGreen.withOpacity(0.1),
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                     child: Text(
-                      'Peringkatmu: #${_myRank!['rank']} · ${_myRank!['total_score']} poin · ${_myRank!['cats_count']} kucing',
+                      'Peringkatmu: #$myRankNum · $myScore poin · $myCats kucing',
                       style: GoogleFonts.nunito(
                         color: AppColors.primaryGreen,
                         fontSize: 13,
@@ -131,7 +135,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   Widget _buildLeaderboardCard(Map<String, dynamic> item) {
-    final int rank = item['rank'] ?? 0;
+    final int rank = int.tryParse(item['rank']?.toString() ?? '') ?? 0;
+    final int score = int.tryParse(item['total_score']?.toString() ?? '') ?? 0;
+    final int catsCount = int.tryParse(item['cats_count']?.toString() ?? '') ?? 0;
+    final int legendaryCount = int.tryParse(item['legendary_count']?.toString() ?? '') ?? 0;
+    final int streak = int.tryParse(item['current_streak']?.toString() ?? '') ?? 0;
+
     final bool isTop3 = rank <= 3;
     final bool isMe = item['is_me'] == true || item['id'] == context.read<AuthProvider>().user?['id'];
 
@@ -234,14 +243,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     // Stats Row
                     Row(
                       children: [
-                        _buildStatChip('🐱 ${item['cats_count']}'),
-                        if ((item['legendary_count'] ?? 0) > 0) ...[
+                        _buildStatChip('🐱 $catsCount'),
+                        if (legendaryCount > 0) ...[
                           const SizedBox(width: 6),
-                          _buildStatChip('⭐ ${item['legendary_count']}'),
+                          _buildStatChip('⭐ $legendaryCount'),
                         ],
-                        if ((item['current_streak'] ?? 0) > 0) ...[
+                        if (streak > 0) ...[
                           const SizedBox(width: 6),
-                          _buildStatChip('🔥 ${item['current_streak']}'),
+                          _buildStatChip('🔥 $streak'),
                         ],
                       ],
                     ),
@@ -254,7 +263,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '${item['total_score'] ?? 0}',
+                    '$score',
                     style: GoogleFonts.nunito(color: const Color(0xFFE4C078), fontSize: 20, fontWeight: FontWeight.w800),
                   ),
                   Text(

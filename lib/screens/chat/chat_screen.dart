@@ -49,7 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchData());
+    _fetchData();
+    _startPolling();
   }
 
   @override
@@ -72,29 +73,36 @@ class _ChatScreenState extends State<ChatScreen> {
         _dio.get('${ApiConfig.baseUrl}/api/groups', options: _authOptions),
       ]);
 
-      setState(() {
-        _friends = results[0].data['friends'] ?? [];
-        _requests = results[1].data['requests'] ?? [];
-        _groups = results[2].data['groups'] ?? [];
-        _isLoading = false;
-        _isRefreshing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _friends = results[0].data['friends'] ?? [];
+          _requests = results[1].data['requests'] ?? [];
+          _groups = results[2].data['groups'] ?? [];
+          _isLoading = false;
+          _isRefreshing = false;
+        });
+      }
     } catch (e) {
       debugPrint('Fetch Social Data Error: $e');
-      setState(() {
-        _isLoading = false;
-        _isRefreshing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+        });
+      }
     }
   }
 
   void _startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted) return;
       if (_activeChatFriend != null) {
         _fetchMessages(_activeChatFriend!['id'].toString(), silent: true);
       } else if (_activeChatGroup != null) {
         _fetchGroupMessages(_activeChatGroup!['id'].toString(), silent: true);
+      } else {
+        _fetchData();
       }
     });
   }

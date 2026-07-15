@@ -28,7 +28,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> fetchMe() async {
     try {
       final res = await _dio.get(
-        ApiConfig.me,
+        '/api/user/profile',
         options: Options(headers: {'Authorization': 'Bearer $_token'}),
       );
       _user = res.data['user'];

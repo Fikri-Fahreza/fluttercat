@@ -20,7 +20,6 @@ class _MainShellState extends State<MainShell> {
   final List<Widget> _screens = const [
     ProfileScreen(),
     FeedScreen(),
-    CameraScreen(),
     CatDexScreen(),
     ChatScreen(),
   ];
@@ -53,8 +52,8 @@ class _MainShellState extends State<MainShell> {
                 _navItem(0, Icons.person, Icons.person_outline, 'Profile'),
                 _navItem(1, Icons.newspaper, Icons.newspaper_outlined, 'Feed'),
                 _cameraButton(),
-                _navItem(3, Icons.photo_library, Icons.photo_library_outlined, 'Album'),
-                _navItem(4, Icons.forum, Icons.forum_outlined, 'Chat'),
+                _navItem(2, Icons.photo_library, Icons.photo_library_outlined, 'Album'),
+                _navItem(3, Icons.forum, Icons.forum_outlined, 'Chat'),
               ],
             ),
           ),
@@ -99,7 +98,12 @@ class _MainShellState extends State<MainShell> {
 
   Widget _cameraButton() {
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = 2),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CameraScreen()),
+        );
+      },
       child: Container(
         width: 60,
         height: 60,

@@ -47,6 +47,8 @@ class _CameraScreenState extends State<CameraScreen> {
           _imageFile = file;
           _photoBase64 = base64Encode(bytes);
         });
+      } else if (_imageFile == null) {
+        if (mounted) Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Take photo error: $e');
