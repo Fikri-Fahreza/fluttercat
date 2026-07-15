@@ -89,6 +89,7 @@ class _FeedScreenState extends State<FeedScreen> {
     try {
       await _dio.post(
         '${ApiConfig.baseUrl}/api/posts/$postId/like',
+        data: {},
         options: _authOptions,
       );
     } catch (_) {
@@ -508,6 +509,7 @@ class _FeedScreenState extends State<FeedScreen> {
             child: Row(
               children: [
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => _toggleLike(post),
                   child: Row(
                     children: [
@@ -519,6 +521,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
                 const SizedBox(width: 20),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => _showCommentsSheet(post),
                   child: Row(
                     children: [
@@ -530,6 +533,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
                 const Spacer(),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => _sharePost(post),
                   child: Row(
                     children: [

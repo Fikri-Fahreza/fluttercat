@@ -30,8 +30,6 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    // Buka kamera otomatis saat halaman dibuka pertama kali
-    WidgetsBinding.instance.addPostFrameCallback((_) => _takePhoto());
   }
 
   Future<void> _takePhoto() async {
@@ -47,8 +45,6 @@ class _CameraScreenState extends State<CameraScreen> {
           _imageFile = file;
           _photoBase64 = base64Encode(bytes);
         });
-      } else if (_imageFile == null) {
-        if (mounted) Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Take photo error: $e');
@@ -179,47 +175,64 @@ class _CameraScreenState extends State<CameraScreen> {
             Positioned.fill(
               child: Container(
                 color: AppColors.bgCream,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Stack(
                   children: [
-                    const Icon(Icons.photo_camera_rounded, size: 70, color: AppColors.primaryGreen),
-                    const SizedBox(height: 15),
-                    Text(
-                      'AI MAIA Scanner',
-                      style: GoogleFonts.nunito(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textBrown,
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.photo_camera_rounded, size: 70, color: AppColors.primaryGreen),
+                          const SizedBox(height: 15),
+                          Text(
+                            'AI MAIA Scanner',
+                            style: GoogleFonts.nunito(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textBrown,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Potret kucing jalanan untuk analisis AI',
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryGreen,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            onPressed: _takePhoto,
+                            icon: const Icon(Icons.camera_alt, color: Colors.white),
+                            label: Text('BUKA KAMERA', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primaryGreen),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: _pickFromGallery,
+                            icon: const Icon(Icons.photo_library, color: AppColors.primaryGreen),
+                            label: Text('PILIH DARI GALERI', style: GoogleFonts.nunito(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Potret kucing jalanan untuk analisis AI',
-                      style: GoogleFonts.nunito(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
+                    Positioned(
+                      top: 50,
+                      left: 20,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity(0.9),
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: AppColors.textBrown),
+                          onPressed: () => Navigator.pop(context),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryGreen,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      onPressed: _takePhoto,
-                      icon: const Icon(Icons.camera_alt, color: Colors.white),
-                      label: Text('BUKA KAMERA', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primaryGreen),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: _pickFromGallery,
-                      icon: const Icon(Icons.photo_library, color: AppColors.primaryGreen),
-                      label: Text('PILIH DARI GALERI', style: GoogleFonts.nunito(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
