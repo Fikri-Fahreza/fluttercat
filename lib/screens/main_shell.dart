@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import 'profile/profile_screen.dart';
@@ -16,6 +17,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  DateTime? _lastPressedAt;
 
   final List<Widget> _screens = const [
     ProfileScreen(),
@@ -26,35 +28,63 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.cardCream,
-          border: Border(top: BorderSide(color: AppColors.borderCream, width: 1)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.textBrown.withOpacity(0.06),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        // Jika tidak di tab pertama (Profile), kembalikan ke tab Profile dulu
+        if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+          return;
+        }
+
+        // Jika sudah di tab Profile, harus menekan tombol kembali 2x dalam 2 detik untuk keluar
+        final now = DateTime.now();
+        if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
+          _lastPressedAt = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tekan sekali lagi untuk keluar aplikasi'),
+              duration: Duration(seconds: 2),
             ),
-          ],
+          );
+          return;
+        }
+
+        // Keluar dari aplikasi secara bersih
+        await SystemNavigator.pop();
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _navItem(0, Icons.person, Icons.person_outline, 'Profile'),
-                _navItem(1, Icons.newspaper, Icons.newspaper_outlined, 'Feed'),
-                _cameraButton(),
-                _navItem(2, Icons.photo_library, Icons.photo_library_outlined, 'Album'),
-                _navItem(3, Icons.forum, Icons.forum_outlined, 'Chat'),
-              ],
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardCream,
+            border: Border(top: BorderSide(color: AppColors.borderCream, width: 1)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.textBrown.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _navItem(0, Icons.person, Icons.person_outline, 'Profile'),
+                  _navItem(1, Icons.newspaper, Icons.newspaper_outlined, 'Feed'),
+                  _cameraButton(),
+                  _navItem(2, Icons.photo_library, Icons.photo_library_outlined, 'Album'),
+                  _navItem(3, Icons.forum, Icons.forum_outlined, 'Chat'),
+                ],
+              ),
             ),
           ),
         ),

@@ -581,10 +581,11 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: ListView.builder(
+              reverse: true,
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
-                final msg = _messages[index];
+                final msg = _messages[_messages.length - 1 - index];
                 final isMe = msg['sender'] == 'me' || msg['sender_id'] == context.read<AuthProvider>().user?['id'];
                 
                 return _buildMessageBubble(msg, isMe);
