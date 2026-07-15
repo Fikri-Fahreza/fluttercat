@@ -249,9 +249,12 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    earned ? (item['icon'] ?? '🏆') : '🔒',
-                    style: TextStyle(fontSize: 36, opacity: earned ? 1.0 : 0.3),
+                  Opacity(
+                    opacity: earned ? 1.0 : 0.3,
+                    child: Text(
+                      earned ? (item['icon'] ?? '🏆') : '🔒',
+                      style: const TextStyle(fontSize: 36),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(

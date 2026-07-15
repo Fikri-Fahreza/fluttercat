@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cupertino_icons/cupertino_icons.dart';
 import '../theme/app_theme.dart';
 import 'profile/profile_screen.dart';
 import 'feed/feed_screen.dart';
@@ -54,8 +53,8 @@ class _MainShellState extends State<MainShell> {
                 _navItem(0, Icons.person, Icons.person_outline, 'Profile'),
                 _navItem(1, Icons.newspaper, Icons.newspaper_outlined, 'Feed'),
                 _cameraButton(),
-                _navItem(3, Icons.albums, Icons.albums_outlined, 'Album'),
-                _navItem(4, Icons.chatbubbles, Icons.chatbubbles_outlined, 'Chat'),
+                _navItem(3, Icons.photo_library, Icons.photo_library_outlined, 'Album'),
+                _navItem(4, Icons.forum, Icons.forum_outlined, 'Chat'),
               ],
             ),
           ),
