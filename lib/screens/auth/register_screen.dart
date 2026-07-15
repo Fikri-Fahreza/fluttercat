@@ -70,6 +70,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           fontWeight: FontWeight.w800,
                           color: AppColors.textBrown,
                         )).animate().fadeIn(delay: 200.ms),
+                    Text('by Fikri',
+                        style: GoogleFonts.nunito(
+                          fontSize: 10,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.bold,
+                        )).animate().fadeIn(delay: 250.ms),
+                    const SizedBox(height: 4),
                     Text('Bergabung dengan komunitas kucing jalanan!',
                         style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMuted),
                         textAlign: TextAlign.center).animate().fadeIn(delay: 300.ms),

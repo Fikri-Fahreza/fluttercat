@@ -49,13 +49,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         .scale(duration: 600.ms, curve: Curves.elasticOut),
                     const SizedBox(height: 12),
                     Text(
-                      'StreetCat Catcher',
+                      'PawFinder',
                       style: GoogleFonts.nunito(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
                         color: AppColors.primaryGreen,
                       ),
                     ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
+                    const SizedBox(height: 2),
+                    Text(
+                      'by Fikri',
+                      style: GoogleFonts.nunito(
+                        fontSize: 10,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ).animate().fadeIn(delay: 250.ms),
                     const SizedBox(height: 6),
                     Text(
                       'Tangkap, koleksi & bagikan kucing jalanan!',

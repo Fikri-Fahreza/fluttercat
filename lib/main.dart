@@ -21,7 +21,7 @@ class StreetCatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'StreetCat Catcher',
+      title: 'PawFinder',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       home: const AppGate(),
@@ -62,11 +62,20 @@ class _AppGateState extends State<AppGate> {
               Text('🐱', style: TextStyle(fontSize: 64)),
               const SizedBox(height: 16),
               Text(
-                'StreetCat Catcher',
+                'PawFinder',
                 style: GoogleFonts.nunito(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primaryGreen,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'by Fikri',
+                style: GoogleFonts.nunito(
+                  fontSize: 10,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
