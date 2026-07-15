@@ -36,6 +36,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (err != null && mounted) {
       setState(() => _error = err);
+    } else if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.cardCream,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Sukses!', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textBrown)),
+          content: Text('Akun berhasil dibuat!', style: GoogleFonts.nunito(color: AppColors.textBrown)),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx); // Tutup dialog
+                Navigator.pop(context); // Tutup RegisterScreen (kembali ke Login yang akan auto redirect ke MainShell)
+              },
+              child: Text('OK', style: GoogleFonts.nunito(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
+            )
+          ],
+        ),
+      );
     }
   }
 

@@ -2,9 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../config/api_config.dart';
+
+// Import sub screens
+import 'leaderboard_screen.dart';
+import 'achievements_screen.dart';
+import 'encyclopedia_screen.dart';
+import 'gift_inbox_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,81 +24,113 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final Dio _dio = Dio();
-  List<dynamic> _leaderboard = [];
-  bool _isLoadingLeaderboard = true;
-  Map<String, dynamic>? _userStats;
-  bool _isLoadingStats = true;
+  Map<String, dynamic>? _profileData;
+  bool _isLoading = true;
+
+  // Edit Profile States
+  bool _showEditModal = false;
+  final TextEditingController _editNameController = TextEditingController();
+  final TextEditingController _editUsernameController = TextEditingController();
+  final TextEditingController _editPasswordController = TextEditingController();
+  String? _editAvatarBase64;
+  File? _selectedAvatarFile;
+  bool _isUpdating = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchLeaderboard();
-      _fetchStats();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchProfile());
+  }
+
+  @override
+  void dispose() {
+    _editNameController.dispose();
+    _editUsernameController.dispose();
+    _editPasswordController.dispose();
+    super.dispose();
   }
 
   String get _token => context.read<AuthProvider>().token ?? '';
+  Options get _authOptions => Options(headers: {'Authorization': 'Bearer $_token', 'Accept': 'application/json'});
 
-  Options get _authOptions =>
-      Options(headers: {'Authorization': 'Bearer $_token'});
-
-  Future<void> _fetchLeaderboard() async {
+  Future<void> _fetchProfile() async {
     try {
       final response = await _dio.get(
-          '${ApiConfig.baseUrl}/api/leaderboard',
-          options: _authOptions);
-      final data = response.data;
-      List<dynamic> board = [];
-      if (data is Map && data['data'] != null) {
-        board = data['data'] as List<dynamic>;
-      } else if (data is List) {
-        board = data;
-      }
+        '${ApiConfig.baseUrl}/api/user/profile',
+        options: _authOptions,
+      );
       setState(() {
-        _leaderboard = board.take(5).toList();
-        _isLoadingLeaderboard = false;
+        _profileData = response.data;
+        _isLoading = false;
       });
-    } catch (_) {
-      setState(() => _isLoadingLeaderboard = false);
+
+      // Initialize edit fields
+      final user = _profileData?['user'];
+      if (user != null) {
+        _editNameController.text = user['name'] ?? '';
+        _editUsernameController.text = user['username'] ?? '';
+        _editAvatarBase64 = user['avatar'];
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch profile: $e');
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _fetchStats() async {
-    try {
-      final results = await Future.wait([
-        _dio
-            .get('${ApiConfig.baseUrl}/api/cats', options: _authOptions)
-            .catchError((_) => Response(
-                requestOptions: RequestOptions(path: ''), data: null)),
-        _dio
-            .get('${ApiConfig.baseUrl}/api/user/stats',
-                options: _authOptions)
-            .catchError((_) => Response(
-                requestOptions: RequestOptions(path: ''), data: null)),
-      ]);
-      final catsData = results[0].data;
-      int catCount = 0;
-      if (catsData is Map && catsData['data'] != null) {
-        catCount = (catsData['data'] as List).length;
-      } else if (catsData is List) {
-        catCount = catsData.length;
-      }
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 200,
+      maxHeight: 200,
+      imageQuality: 50,
+    );
 
-      final statsData = results[1].data;
-      Map<String, dynamic> stats = {'cat_count': catCount};
-      if (statsData is Map) {
-        final s = statsData['data'] ?? statsData;
-        if (s is Map) stats.addAll(s.cast<String, dynamic>());
-      }
-      stats['cat_count'] = catCount;
+    if (image != null) {
+      final file = File(image.path);
+      final bytes = await file.readAsBytes();
       setState(() {
-        _userStats = stats;
-        _isLoadingStats = false;
+        _selectedAvatarFile = file;
+        _editAvatarBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       });
-    } catch (_) {
-      setState(() => _isLoadingStats = false);
     }
+  }
+
+  Future<void> _updateProfile() async {
+    if (_editNameController.text.trim().isEmpty || _editUsernameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama dan Username tidak boleh kosong.')),
+      );
+      return;
+    }
+
+    setState(() => _isUpdating = true);
+    try {
+      await _dio.post(
+        '${ApiConfig.baseUrl}/api/user/profile/update',
+        data: {
+          'name': _editNameController.text.trim(),
+          'username': _editUsernameController.text.trim().toLowerCase(),
+          'password': _editPasswordController.text.trim().isNotEmpty ? _editPasswordController.text.trim() : null,
+          'avatar': _editAvatarBase64,
+        },
+        options: _authOptions,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil Anda berhasil diperbarui!')),
+      );
+      setState(() {
+        _showEditModal = false;
+        _editPasswordController.clear();
+      });
+      _fetchProfile(); // Refresh profile screen data
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal memperbarui profil.')),
+      );
+    }
+    setState(() => _isUpdating = false);
   }
 
   Future<void> _logout() async {
@@ -97,29 +138,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.cardCream,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: Text('Logout',
-            style: GoogleFonts.nunito(
-                color: AppColors.textBrown,
-                fontWeight: FontWeight.bold)),
-        content: Text('Yakin mau logout dari StreetCat?',
-            style: GoogleFonts.nunito(color: AppColors.textBrown)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Logout', style: GoogleFonts.nunito(color: AppColors.textBrown, fontWeight: FontWeight.bold)),
+        content: Text('Yakin mau logout dari PawFinder?', style: GoogleFonts.nunito(color: AppColors.textBrown)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Batal',
-                style: GoogleFonts.nunito(color: AppColors.textMuted)),
+            child: Text('Batal', style: GoogleFonts.nunito(color: AppColors.textMuted)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8))),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Logout',
-                style: GoogleFonts.nunito(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text('Logout', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -129,407 +159,474 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _refreshAll() async {
-    setState(() {
-      _isLoadingLeaderboard = true;
-      _isLoadingStats = true;
-    });
-    await Future.wait([_fetchLeaderboard(), _fetchStats()]);
-  }
-
-  String _getRankEmoji(int rank) {
-    switch (rank) {
-      case 1:
-        return '🥇';
-      case 2:
-        return '🥈';
-      case 3:
-        return '🥉';
-      default:
-        return '#$rank';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
-    final int catCount = _userStats?['cat_count'] ?? 0;
-    final int points = int.tryParse(
-            user?['points']?.toString() ??
-                user?['poin']?.toString() ??
-                '0') ??
-        0;
-    final int achievements = catCount ~/ 3;
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.bgCream,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: AppColors.primaryGreen),
+              const SizedBox(height: 15),
+              Text(
+                'Memuat Jurnal Kucing...',
+                style: GoogleFonts.nunito(color: AppColors.textBrown, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final user = _profileData?['user'] ?? {};
+    final int catsCount = _profileData?['cats_count'] ?? 0;
+    final int score = user['total_score'] ?? 0;
+    final int level = (score ~/ 100) + 1;
+    final double levelProgress = (score % 100) / 100.0;
+    final int streak = user['current_streak'] ?? 0;
+
+    final String? avatarBase64 = user['avatar'];
+    ImageProvider avatarProvider;
+    if (avatarBase64 != null && avatarBase64.startsWith('data:image')) {
+      final base64Str = avatarBase64.split(',').last;
+      avatarProvider = MemoryImage(base64Decode(base64Str));
+    } else {
+      avatarProvider = const AssetImage('assets/images/cat_character.png');
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgCream,
-      body: RefreshIndicator(
-        color: AppColors.primaryGreen,
-        onRefresh: _refreshAll,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              expandedHeight: 240,
-              pinned: true,
-              automaticallyImplyLeading: false,
-              backgroundColor: AppColors.primaryGreen,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.white),
-                  onPressed: _logout,
-                  tooltip: 'Logout',
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF708A5A), Color(0xFF4A5E3C)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 40),
-                        CircleAvatar(
-                          radius: 44,
-                          backgroundColor: AppColors.softGold,
-                          child: Text(
-                            (user?['name'] ??
-                                    user?['username'] ??
-                                    'U')
-                                .substring(0, 1)
-                                .toUpperCase(),
-                            style: GoogleFonts.nunito(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textBrown),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          user?['name'] ?? 'Cat Hunter',
-                          style: GoogleFonts.nunito(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
-                        ),
-                        Text(
-                          '@${user?['username'] ?? ''}',
-                          style: GoogleFonts.nunito(
-                              fontSize: 14, color: Colors.white70),
-                        ),
-                        if (user?['email'] != null)
-                          Text(
-                            user!['email'],
-                            style: GoogleFonts.nunito(
-                                fontSize: 13, color: Colors.white60),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: RefreshIndicator(
+              color: AppColors.primaryGreen,
+              onRefresh: _fetchProfile,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Stats row
+                    // Top Header Row
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildStatCard('🐱', '$catCount', 'Kucing'),
-                        const SizedBox(width: 12),
-                        _buildStatCard('⭐', '$points', 'Poin'),
-                        const SizedBox(width: 12),
-                        _buildStatCard(
-                            '🏆', '$achievements', 'Achievements'),
+                        Row(
+                          children: [
+                            Container(
+                              width: 54,
+                              height: 54,
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.primaryGreen, width: 2),
+                              ),
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: AppColors.cardCream,
+                                backgroundImage: avatarProvider,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user['name'] ?? 'Guest',
+                                  style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textBrown),
+                                ),
+                                Text(
+                                  '@${user['username'] ?? 'username'}',
+                                  style: GoogleFonts.nunito(fontSize: 12, color: AppColors.primaryGreen, fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            // Logout icon
+                            IconButton(
+                              icon: const Icon(Icons.logout, color: AppColors.danger, size: 20),
+                              onPressed: _logout,
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _showEditModal = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.lightGreen,
+                                  border: Border.all(color: AppColors.primaryGreen),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.edit, size: 12, color: AppColors.primaryGreen),
+                                    const SizedBox(width: 4),
+                                    Text('EDIT PROFIL', style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primaryGreen)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 25),
 
-                    // Profile info card
+                    // Mascot Center Card
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: AppColors.cardCream,
-                        borderRadius: BorderRadius.circular(16),
-                        border:
-                            Border.all(color: AppColors.borderCream),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.borderCream),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.textBrown.withOpacity(0.03),
+                            blurRadius: 6,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Image.asset(
+                            'assets/images/cat_character.png',
+                            width: 140,
+                            height: 140,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const SizedBox(
+                              height: 140,
+                              child: Center(child: Text('🐱', style: TextStyle(fontSize: 64))),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          // Level progress row
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGreen,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text('LVL $level', style: GoogleFonts.nunito(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: levelProgress,
+                                    backgroundColor: AppColors.borderCream,
+                                    color: AppColors.primaryGreen,
+                                    minHeight: 8,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+
+                    // Navigation Grid Menu
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 2.6,
+                      children: [
+                        _gridMenuItem(
+                          label: 'Leaderboard',
+                          icon: Icons.emoji_events,
+                          iconColor: const Color(0xFFFFD700),
+                          bgColor: const Color(0xFFFFD700).withOpacity(0.12),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaderboardScreen())),
+                        ),
+                        _gridMenuItem(
+                          label: 'Achievement',
+                          icon: Icons.workspace_premium,
+                          iconColor: const Color(0xFF9B59B6),
+                          bgColor: const Color(0xFF9B59B6).withOpacity(0.12),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                        ),
+                        _gridMenuItem(
+                          label: 'Catlogue',
+                          icon: Icons.menu_book,
+                          iconColor: const Color(0xFF27AE60),
+                          bgColor: const Color(0xFF27AE60).withOpacity(0.12),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EncyclopediaScreen())),
+                        ),
+                        _gridMenuItem(
+                          label: 'Kado Masuk',
+                          icon: Icons.card_giftcard,
+                          iconColor: const Color(0xFFFF6B6B),
+                          bgColor: const Color(0xFFFF6B6B).withOpacity(0.12),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GiftInboxScreen())),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 25),
+
+                    // Journal Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardCream,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.borderCream),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Informasi Akun',
-                              style: GoogleFonts.nunito(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textBrown,
-                                  fontSize: 16)),
-                          const SizedBox(height: 12),
-                          _buildInfoRow(Icons.person, 'Nama',
-                              user?['name'] ?? '-'),
-                          const Divider(color: AppColors.borderCream),
-                          _buildInfoRow(Icons.alternate_email,
-                              'Username',
-                              '@${user?['username'] ?? '-'}'),
-                          const Divider(color: AppColors.borderCream),
-                          _buildInfoRow(Icons.email, 'Email',
-                              user?['email'] ?? '-'),
-                          if (user?['role'] != null) ...[
-                            const Divider(
-                                color: AppColors.borderCream),
-                            _buildInfoRow(Icons.badge, 'Role',
-                                user!['role']),
-                          ],
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('SIGHTINGS LOGGED', style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5)),
+                                  const SizedBox(height: 2),
+                                  Text('Jurnal Kucing Liar', style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textBrown)),
+                                ],
+                              ),
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(color: AppColors.primaryGreen, shape: BoxShape.circle),
+                                alignment: Alignment.center,
+                                child: Text('$catsCount', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          // Stats List
+                          _journalStatItem(num: '01', icon: Icons.star, iconColor: const Color(0xFFE4C078), bgColor: const Color(0xFFFFF9E6), label: 'TOTAL SKOR', value: '$score Poin'),
+                          const SizedBox(height: 10),
+                          _journalStatItem(num: '02', icon: Icons.camera_alt, iconColor: AppColors.primaryGreen, bgColor: const Color(0xFFEBF3E8), label: 'DITANGKAP HARI INI', value: '$catsCount'),
+                          const SizedBox(height: 10),
+                          _journalStatItem(num: '03', icon: Icons.local_fire_department, iconColor: const Color(0xFFD96A6A), bgColor: const Color(0xFFF6F2EB), label: 'STREAK PENANGKAPAN', value: '$streak Hari'),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-
-                    // Leaderboard section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Leaderboard 🏆',
-                            style: GoogleFonts.nunito(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textBrown,
-                                fontSize: 18)),
-                        if (!_isLoadingLeaderboard)
-                          TextButton(
-                            onPressed: _fetchLeaderboard,
-                            child: Text('Refresh',
-                                style: GoogleFonts.nunito(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    _isLoadingLeaderboard
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(24),
-                              child: CircularProgressIndicator(
-                                  color: AppColors.primaryGreen),
-                            ),
-                          )
-                        : _leaderboard.isEmpty
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Text(
-                                      'Leaderboard belum tersedia',
-                                      style: GoogleFonts.nunito(
-                                          color: AppColors.textMuted)),
-                                ),
-                              )
-                            : Column(
-                                children: List.generate(
-                                    _leaderboard.length, (i) {
-                                  final entry = _leaderboard[i];
-                                  final rank = i + 1;
-                                  final isCurrentUser =
-                                      entry['username'] ==
-                                          user?['username'];
-                                  return Container(
-                                    margin: const EdgeInsets.only(
-                                        bottom: 8),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: isCurrentUser
-                                          ? AppColors.lightGreen
-                                          : AppColors.cardCream,
-                                      borderRadius:
-                                          BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: isCurrentUser
-                                              ? AppColors.primaryGreen
-                                                  .withOpacity(0.4)
-                                              : AppColors.borderCream),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 36,
-                                          child: Text(
-                                            _getRankEmoji(rank),
-                                            style: TextStyle(
-                                                fontSize: rank <= 3
-                                                    ? 22
-                                                    : 16),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        CircleAvatar(
-                                          radius: 16,
-                                          backgroundColor: isCurrentUser
-                                              ? AppColors.primaryGreen
-                                              : AppColors.lightGreen,
-                                          child: Text(
-                                            (entry['name'] ??
-                                                    entry['username'] ??
-                                                    'U')
-                                                .substring(0, 1)
-                                                .toUpperCase(),
-                                            style: GoogleFonts.nunito(
-                                                fontWeight:
-                                                    FontWeight.bold,
-                                                color: isCurrentUser
-                                                    ? Colors.white
-                                                    : AppColors
-                                                        .primaryGreen,
-                                                fontSize: 13),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                  entry['name'] ??
-                                                      entry['username'] ??
-                                                      '-',
-                                                  style: GoogleFonts.nunito(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: AppColors
-                                                          .textBrown,
-                                                      fontSize: 14),
-                                                  overflow:
-                                                      TextOverflow
-                                                          .ellipsis),
-                                              Text(
-                                                  '@${entry['username'] ?? ''}',
-                                                  style: GoogleFonts.nunito(
-                                                      color: AppColors
-                                                          .textMuted,
-                                                      fontSize: 12)),
-                                            ],
-                                          ),
-                                        ),
-                                        Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.softGold
-                                                .withOpacity(0.3),
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          child: Text(
-                                              '${entry['points'] ?? entry['poin'] ?? 0} pts',
-                                              style: GoogleFonts.nunito(
-                                                  fontWeight:
-                                                      FontWeight.bold,
-                                                  color:
-                                                      AppColors.textBrown,
-                                                  fontSize: 13)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ),
-
-                    const SizedBox(height: 20),
-
-                    // Logout button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.danger,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: _logout,
-                        icon: const Icon(Icons.logout,
-                            color: Colors.white),
-                        label: Text('Logout',
-                            style: GoogleFonts.nunito(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+
+          // Edit Profile Modal Overlay
+          if (_showEditModal) _buildEditModal(avatarProvider),
+        ],
       ),
     );
   }
 
-  Widget _buildStatCard(String emoji, String value, String label) {
-    return Expanded(
+  Widget _gridMenuItem({
+    required String label,
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: AppColors.cardCream,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.borderCream),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04), blurRadius: 6)
-          ],
         ),
-        child: Column(
+        child: Row(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(height: 4),
-            Text(value,
-                style: GoogleFonts.nunito(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textBrown)),
-            Text(label,
-                style: GoogleFonts.nunito(
-                    fontSize: 11, color: AppColors.textMuted),
-                textAlign: TextAlign.center),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text(label, style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textBrown)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+  Widget _journalStatItem({
+    required String num,
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(16)),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.primaryGreen),
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.08), shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text(num, style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textBrown)),
+          ),
           const SizedBox(width: 10),
-          Text('$label:',
-              style: GoogleFonts.nunito(
-                  color: AppColors.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(width: 8),
+          Icon(icon, color: iconColor, size: 16),
+          const SizedBox(width: 6),
           Expanded(
-              child: Text(value,
-                  style: GoogleFonts.nunito(
-                      color: AppColors.textBrown,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: GoogleFonts.nunito(fontSize: 8, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+                Text(value, style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textBrown)),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEditModal(ImageProvider currentAvatar) {
+    ImageProvider pickerAvatarProvider;
+    if (_editAvatarBase64 != null && _editAvatarBase64!.startsWith('data:image')) {
+      final base64Str = _editAvatarBase64!.split(',').last;
+      pickerAvatarProvider = MemoryImage(base64Decode(base64Str));
+    } else {
+      pickerAvatarProvider = currentAvatar;
+    }
+
+    return Container(
+      color: Colors.black54,
+      width: double.infinity,
+      height: double.infinity,
+      alignment: Alignment.bottomCenter,
+      child: Material(
+        color: AppColors.bgCream,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 40,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Edit Profil Anda', style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textBrown)),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textBrown),
+                    onPressed: () => setState(() => _showEditModal = false),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Avatar Picker
+              Column(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primaryGreen, width: 2.5)),
+                    child: CircleAvatar(
+                      radius: 36,
+                      backgroundColor: AppColors.cardCream,
+                      backgroundImage: pickerAvatarProvider,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _pickAvatar,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(color: AppColors.primaryGreen, borderRadius: BorderRadius.circular(8)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.camera_alt, color: Colors.white, size: 12),
+                          const SizedBox(width: 4),
+                          Text('Ubah Foto', style: GoogleFonts.nunito(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+
+              // Name
+              _editProfileLabel('Nama Lengkap'),
+              TextField(
+                controller: _editNameController,
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textBrown),
+                decoration: const InputDecoration(hintText: 'Masukkan nama lengkap...'),
+              ),
+              const SizedBox(height: 15),
+
+              // Username
+              _editProfileLabel('Username'),
+              TextField(
+                controller: _editUsernameController,
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textBrown),
+                decoration: const InputDecoration(hintText: 'Masukkan username...'),
+              ),
+              const SizedBox(height: 15),
+
+              // Password
+              _editProfileLabel('Password Baru'),
+              TextField(
+                controller: _editPasswordController,
+                obscureText: true,
+                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textBrown),
+                decoration: const InputDecoration(hintText: 'Kosongkan jika tidak ingin diubah'),
+              ),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: _isUpdating ? null : _updateProfile,
+                  child: _isUpdating
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text('SIMPAN PERUBAHAN', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _editProfileLabel(String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textBrown)),
       ),
     );
   }

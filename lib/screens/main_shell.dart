@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cupertino_icons/cupertino_icons.dart';
 import '../theme/app_theme.dart';
-import 'home/home_screen.dart';
+import 'profile/profile_screen.dart';
 import 'feed/feed_screen.dart';
 import 'camera/camera_screen.dart';
-import 'map/map_screen.dart';
-import 'profile/profile_screen.dart';
+import 'catdex/catdex_screen.dart';
+import 'chat/chat_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -18,11 +19,11 @@ class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
-    HomeScreen(),
+    ProfileScreen(),
     FeedScreen(),
     CameraScreen(),
-    MapScreen(),
-    ProfileScreen(),
+    CatDexScreen(),
+    ChatScreen(),
   ];
 
   @override
@@ -50,11 +51,11 @@ class _MainShellState extends State<MainShell> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _navItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
-                _navItem(1, Icons.people_rounded, Icons.people_outline_rounded, 'Feed'),
+                _navItem(0, Icons.person, Icons.person_outline, 'Profile'),
+                _navItem(1, Icons.newspaper, Icons.newspaper_outlined, 'Feed'),
                 _cameraButton(),
-                _navItem(3, Icons.map_rounded, Icons.map_outlined, 'Peta'),
-                _navItem(4, Icons.person_rounded, Icons.person_outline_rounded, 'Profil'),
+                _navItem(3, Icons.albums, Icons.albums_outlined, 'Album'),
+                _navItem(4, Icons.chatbubbles, Icons.chatbubbles_outlined, 'Chat'),
               ],
             ),
           ),
@@ -101,15 +102,16 @@ class _MainShellState extends State<MainShell> {
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = 2),
       child: Container(
-        width: 56,
-        height: 56,
+        width: 60,
+        height: 60,
         decoration: BoxDecoration(
           color: AppColors.primaryGreen,
           shape: BoxShape.circle,
+          border: Border.all(color: AppColors.cardCream, width: 3),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryGreen.withOpacity(0.4),
-              blurRadius: 12,
+              color: AppColors.primaryGreen.withOpacity(0.3),
+              blurRadius: 8,
               offset: const Offset(0, 4),
             ),
           ],
