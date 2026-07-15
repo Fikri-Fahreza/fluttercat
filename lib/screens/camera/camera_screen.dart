@@ -127,7 +127,7 @@ class _CameraScreenState extends State<CameraScreen> {
             filename: 'cat_photo.jpg'),
       });
       final response = await _dio.post(
-        '${ApiConfig.baseUrl}/api/cats',
+        '${ApiConfig.baseUrl}/api/cats/catch',
         data: formData,
         options: Options(headers: {
           'Authorization': 'Bearer $token',

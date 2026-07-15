@@ -53,7 +53,7 @@ class _FeedScreenState extends State<FeedScreen> {
             .catchError((_) => Response(
                 requestOptions: RequestOptions(path: ''), data: null)),
         _dio
-            .get('${ApiConfig.baseUrl}/api/cat-of-the-day',
+            .get('${ApiConfig.baseUrl}/api/feed/cat-of-the-day',
                 options: _authOptions)
             .catchError((_) => Response(
                 requestOptions: RequestOptions(path: ''), data: null)),

@@ -1,5 +1,5 @@
 class ApiConfig {
-  static const String baseUrl = 'https://random.ezaneproject.my.id';
+  static const String baseUrl = 'https://random.ezaneproject.my.id/meowbackend/public';
 
   // Auth
   static const String login = '/api/login';
