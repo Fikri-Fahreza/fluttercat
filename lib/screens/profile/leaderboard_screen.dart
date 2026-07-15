@@ -16,9 +16,11 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   final Dio _dio = Dio();
   List<dynamic> _leaderboard = [];
+  List<dynamic> _friends = [];
   Map<String, dynamic>? _myRank;
   bool _isLoading = true;
   bool _isRefreshing = false;
+  String _activeFilter = 'global'; // global, teman
 
   @override
   void initState() {
@@ -31,15 +33,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   Future<void> _fetchLeaderboard() async {
     try {
-      final res = await _dio.get('${ApiConfig.baseUrl}/api/leaderboard', options: _authOptions);
+      final results = await Future.wait([
+        _dio.get('${ApiConfig.baseUrl}/api/leaderboard', options: _authOptions),
+        _dio.get('${ApiConfig.baseUrl}/api/friends', options: _authOptions),
+      ]);
       setState(() {
-        _leaderboard = res.data['leaderboard'] ?? [];
-        _myRank = res.data['my_rank'];
+        _leaderboard = results[0].data['leaderboard'] ?? [];
+        _myRank = results[0].data['my_rank'];
+        _friends = results[1].data['friends'] ?? [];
         _isLoading = false;
         _isRefreshing = false;
       });
     } catch (e) {
-      debugPrint('Leaderboard error: $e');
+      debugPrint('Leaderboard fetch error: $e');
       setState(() {
         _isLoading = false;
         _isRefreshing = false;
@@ -59,11 +65,93 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     return '#$rank';
   }
 
+  Widget _buildFilterTabs() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.borderCream.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _buildFilterTab('global', 'Global')),
+          Expanded(child: _buildFilterTab('teman', 'Teman')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterTab(String filterType, String title) {
+    final isActive = _activeFilter == filterType;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFilter = filterType),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primaryGreen : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          title,
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.bold,
+            color: isActive ? Colors.white : AppColors.textBrown,
+            fontSize: 13,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    int myRankNum = int.tryParse(_myRank?['rank']?.toString() ?? '') ?? 0;
-    int myScore = int.tryParse(_myRank?['total_score']?.toString() ?? '') ?? 0;
-    int myCats = int.tryParse(_myRank?['cats_count']?.toString() ?? '') ?? 0;
+    final myUserId = context.read<AuthProvider>().user?['id'];
+    List<dynamic> displayList = _leaderboard;
+    Map<String, dynamic>? activeMyRank = _myRank;
+
+    if (_activeFilter == 'teman') {
+      final friendIds = _friends.map((f) => f['id']).toSet();
+      final filtered = _leaderboard.where((item) {
+        final id = item['id'];
+        final isMe = item['is_me'] == true || id == myUserId;
+        return isMe || friendIds.contains(id);
+      }).toList();
+
+      // Sort by score
+      filtered.sort((a, b) {
+        final int scoreA = int.tryParse(a['total_score']?.toString() ?? '') ?? 0;
+        final int scoreB = int.tryParse(b['total_score']?.toString() ?? '') ?? 0;
+        return scoreB.compareTo(scoreA);
+      });
+
+      // Recalculate rank
+      final List<Map<String, dynamic>> friendList = [];
+      for (int i = 0; i < filtered.length; i++) {
+        final clone = Map<String, dynamic>.from(filtered[i]);
+        clone['rank'] = i + 1;
+        friendList.add(clone);
+      }
+      displayList = friendList;
+
+      // Extract my rank from friend list
+      try {
+        final myFriendEntry = displayList.firstWhere((item) => item['is_me'] == true || item['id'] == myUserId);
+        activeMyRank = {
+          'rank': myFriendEntry['rank'],
+          'total_score': myFriendEntry['total_score'],
+          'cats_count': myFriendEntry['cats_count'],
+          'rank_shown_in_list': false,
+        };
+      } catch (_) {
+        activeMyRank = null;
+      }
+    }
+
+    int myRankNum = int.tryParse(activeMyRank?['rank']?.toString() ?? '') ?? 0;
+    int myScore = int.tryParse(activeMyRank?['total_score']?.toString() ?? '') ?? 0;
+    int myCats = int.tryParse(activeMyRank?['cats_count']?.toString() ?? '') ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.bgCream,
@@ -87,8 +175,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             )
           : Column(
               children: [
+                _buildFilterTabs(),
+
                 // My Rank banner
-                if (_myRank != null && _myRank!['rank_shown_in_list'] != true)
+                if (activeMyRank != null && activeMyRank['rank_shown_in_list'] != true)
                   Container(
                     width: double.infinity,
                     color: AppColors.primaryGreen.withOpacity(0.1),
@@ -105,7 +195,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ),
 
                 Expanded(
-                  child: _leaderboard.isEmpty
+                  child: displayList.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -121,9 +211,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           onRefresh: _onRefresh,
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _leaderboard.length,
+                            itemCount: displayList.length,
                             itemBuilder: (context, index) {
-                              final item = _leaderboard[index];
+                              final item = displayList[index];
                               return _buildLeaderboardCard(item);
                             },
                           ),

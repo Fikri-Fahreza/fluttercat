@@ -102,6 +102,49 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
+  Future<void> _confirmDeletePost(Map<String, dynamic> post) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardCream,
+        title: Text('Hapus Postingan', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textBrown)),
+        content: Text('Yakin ingin menghapus postingan ini?', style: GoogleFonts.nunito(color: AppColors.textBrown)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal', style: GoogleFonts.nunito(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Hapus', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final postId = post['id'];
+        await _dio.delete(
+          '${ApiConfig.baseUrl}/api/posts/$postId',
+          options: _authOptions,
+        );
+        setState(() {
+          _posts.removeWhere((p) => p['id'] == postId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Postingan berhasil dihapus.')),
+        );
+      } catch (e) {
+        debugPrint('Delete post error: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menghapus postingan.')),
+        );
+      }
+    }
+  }
+
   Future<void> _createPost() async {
     final caption = _captionController.text.trim();
     if (caption.isEmpty && _selectedCat == null) {
@@ -447,6 +490,13 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                 ),
                 Text(formattedDate, style: GoogleFonts.nunito(color: AppColors.textMuted, fontSize: 11)),
+                if (user['id'] == context.read<AuthProvider>().user?['id'] || post['user_id'] == context.read<AuthProvider>().user?['id']) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _confirmDeletePost(post),
+                    child: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
+                  ),
+                ],
               ],
             ),
           ),
