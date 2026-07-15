@@ -123,14 +123,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Email
+                    // Email/Username
                     TextField(
                       controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
+                      keyboardType: TextInputType.text,
                       style: GoogleFonts.nunito(color: AppColors.textBrown),
                       decoration: InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: const Icon(Icons.email_outlined, color: AppColors.primaryGreen),
+                        labelText: 'Username atau Email',
+                        prefixIcon: const Icon(Icons.person_outline, color: AppColors.primaryGreen),
                       ),
                     ),
                     const SizedBox(height: 14),

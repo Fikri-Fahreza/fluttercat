@@ -41,15 +41,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> login(String email, String password) async {
+  Future<String?> login(String emailOrUsername, String password) async {
     _isLoading = true;
     notifyListeners();
     try {
       final res = await _dio.post(ApiConfig.login, data: {
-        'email': email,
+        'login': emailOrUsername,
         'password': password,
       });
-      _token = res.data['token'];
+      _token = res.data['access_token'];
       _user = res.data['user'];
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', _token!);
@@ -74,7 +74,7 @@ class AuthProvider extends ChangeNotifier {
         'password': password,
         'password_confirmation': password,
       });
-      _token = res.data['token'];
+      _token = res.data['access_token'];
       _user = res.data['user'];
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', _token!);
