@@ -79,11 +79,12 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _toggleLike(Map<String, dynamic> post) async {
     final postId = post['id'];
     final bool currentlyLiked = post['is_liked_by_me'] == true || post['is_liked_by_me'] == 1;
+    final int currentLikes = int.tryParse(post['likes_count']?.toString() ?? '') ?? 0;
     
     // Optimistic Update
     setState(() {
       post['is_liked_by_me'] = !currentlyLiked;
-      post['likes_count'] = (post['likes_count'] ?? 0) + (currentlyLiked ? -1 : 1);
+      post['likes_count'] = currentLikes + (currentlyLiked ? -1 : 1);
     });
 
     try {
@@ -96,7 +97,7 @@ class _FeedScreenState extends State<FeedScreen> {
       // Revert if error
       setState(() {
         post['is_liked_by_me'] = currentlyLiked;
-        post['likes_count'] = (post['likes_count'] ?? 0) + (currentlyLiked ? 1 : -1);
+        post['likes_count'] = currentLikes;
       });
     }
   }
@@ -141,7 +142,7 @@ class _FeedScreenState extends State<FeedScreen> {
     setState(() => _isCreatingPost = false);
   }
 
-  Future<void> _sendComment() async {
+  Future<void> _sendComment(VoidCallback onCommentAdded) async {
     final text = _commentController.text.trim();
     if (text.isEmpty || _activePostForComments == null || _isSendingComment) return;
 
@@ -155,11 +156,16 @@ class _FeedScreenState extends State<FeedScreen> {
       );
 
       final newComment = res.data['comment'];
+      final int currentCommentsCount = int.tryParse(post['comments_count']?.toString() ?? '') ?? 0;
+
       setState(() {
         post['comments'] = [...(post['comments'] ?? []), newComment];
-        post['comments_count'] = (post['comments_count'] ?? 0) + 1;
+        post['comments_count'] = currentCommentsCount + 1;
         _commentController.clear();
       });
+
+      onCommentAdded();
+      FocusScope.of(context).unfocus();
     } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Gagal mengirim komentar.')),
@@ -793,86 +799,89 @@ class _FeedScreenState extends State<FeedScreen> {
   void _showCommentsSheet(Map<String, dynamic> post) {
     _activePostForComments = post;
     _commentController.clear();
-    final comments = post['comments'] as List? ?? [];
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: AppColors.bgCream,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          height: MediaQuery.of(context).size.height * 0.75,
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Komentar (${comments.length})', style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textBrown)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const Divider(),
-              Expanded(
-                child: comments.isEmpty
-                    ? Center(child: Text('Belum ada komentar.', style: GoogleFonts.nunito(color: AppColors.textMuted)))
-                    : ListView.builder(
-                        itemCount: comments.length,
-                        itemBuilder: (c, idx) {
-                          final item = comments[idx];
-                          final cUser = item['user'] ?? {};
-                          return ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: Row(
-                              children: [
-                                Text(cUser['name'] ?? '', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 12)),
-                                const SizedBox(width: 6),
-                                Text('@${cUser['username'] ?? ''}', style: GoogleFonts.nunito(color: AppColors.textMuted, fontSize: 10)),
-                              ],
-                            ),
-                            subtitle: Text(item['comment'] ?? '', style: GoogleFonts.nunito(color: AppColors.textBrown, fontSize: 12)),
-                          );
-                        },
-                      ),
-              ),
-              const Divider(),
-              // Comment input row
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _commentController,
-                      style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textBrown),
-                      decoration: InputDecoration(
-                        hintText: 'Tulis komentar...',
-                        fillColor: AppColors.cardCream,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        builder: (context, setModalState) {
+          final comments = post['comments'] as List? ?? [];
+          return Container(
+            decoration: const BoxDecoration(
+              color: AppColors.bgCream,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            height: MediaQuery.of(context).size.height * 0.75,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Komentar (${comments.length})', style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textBrown)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const Divider(),
+                Expanded(
+                  child: comments.isEmpty
+                      ? Center(child: Text('Belum ada komentar.', style: GoogleFonts.nunito(color: AppColors.textMuted)))
+                      : ListView.builder(
+                          itemCount: comments.length,
+                          itemBuilder: (c, idx) {
+                            final item = comments[idx];
+                            final cUser = item['user'] ?? {};
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Row(
+                                children: [
+                                  Text(cUser['name'] ?? '', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  const SizedBox(width: 6),
+                                  Text('@${cUser['username'] ?? ''}', style: GoogleFonts.nunito(color: AppColors.textMuted, fontSize: 10)),
+                                ],
+                              ),
+                              subtitle: Text(item['comment'] ?? '', style: GoogleFonts.nunito(color: AppColors.textBrown, fontSize: 12)),
+                            );
+                          },
+                        ),
+                ),
+                const Divider(),
+                // Comment input row
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textBrown),
+                        decoration: InputDecoration(
+                          hintText: 'Tulis komentar...',
+                          fillColor: AppColors.cardCream,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send, color: AppColors.primaryGreen),
-                    onPressed: () async {
-                      await _sendComment();
-                      setModalState(() {});
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.send, color: AppColors.primaryGreen),
+                      onPressed: () async {
+                        await _sendComment(() {
+                          setModalState(() {});
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
