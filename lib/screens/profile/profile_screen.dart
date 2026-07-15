@@ -181,17 +181,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final user = _profileData?['user'] ?? {};
-    final int catsCount = _profileData?['cats_count'] ?? 0;
-    final int score = user['total_score'] ?? 0;
+    final int catsCount = int.tryParse(_profileData?['cats_count']?.toString() ?? '') ?? 0;
+    final int score = int.tryParse(user['total_score']?.toString() ?? '') ?? 0;
     final int level = (score ~/ 100) + 1;
     final double levelProgress = (score % 100) / 100.0;
-    final int streak = user['current_streak'] ?? 0;
+    final int streak = int.tryParse(user['current_streak']?.toString() ?? '') ?? 0;
 
-    final String? avatarBase64 = user['avatar'];
+    final String? avatar = user['avatar'];
     ImageProvider avatarProvider;
-    if (avatarBase64 != null && avatarBase64.startsWith('data:image')) {
-      final base64Str = avatarBase64.split(',').last;
-      avatarProvider = MemoryImage(base64Decode(base64Str));
+    if (avatar != null && avatar.isNotEmpty) {
+      if (avatar.startsWith('data:image')) {
+        try {
+          final base64Str = avatar.split(',').last;
+          avatarProvider = MemoryImage(base64Decode(base64Str));
+        } catch (_) {
+          avatarProvider = const AssetImage('assets/images/cat_character.png');
+        }
+      } else {
+        final url = avatar.startsWith('http') ? avatar : '${ApiConfig.baseUrl}$avatar';
+        avatarProvider = NetworkImage(url);
+      }
     } else {
       avatarProvider = const AssetImage('assets/images/cat_character.png');
     }

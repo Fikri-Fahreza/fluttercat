@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../config/api_config.dart';
+import '../profile/detail_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -18,497 +20,302 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   final Dio _dio = Dio();
-  final _formKey = GlobalKey<FormState>();
   final ImagePicker _picker = ImagePicker();
 
   File? _imageFile;
-  bool _isUploading = false;
-  bool _isGettingLocation = false;
-  String? _uploadError;
-  String? _uploadSuccess;
-
-  final _nameController = TextEditingController();
-  final _breedController = TextEditingController();
-  final _colorController = TextEditingController();
-  final _descController = TextEditingController();
-  final _latController = TextEditingController();
-  final _lngController = TextEditingController();
-
-  String _selectedRarity = 'Common';
-  final List<String> _rarities = [
-    'Common',
-    'Uncommon',
-    'Rare',
-    'Epic',
-    'Legendary'
-  ];
+  String? _photoBase64;
+  bool _isLoading = false;
+  String _loadingText = '';
 
   @override
   void initState() {
     super.initState();
-    _getLocation();
+    // Buka kamera otomatis saat halaman dibuka pertama kali
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takePhoto());
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _breedController.dispose();
-    _colorController.dispose();
-    _descController.dispose();
-    _latController.dispose();
-    _lngController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _getLocation() async {
-    setState(() => _isGettingLocation = true);
+  Future<void> _takePhoto() async {
     try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 50,
+      );
+      if (photo != null) {
+        final file = File(photo.path);
+        final bytes = await file.readAsBytes();
+        setState(() {
+          _imageFile = file;
+          _photoBase64 = base64Encode(bytes);
+        });
+      }
+    } catch (e) {
+      debugPrint('Take photo error: $e');
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50,
+      );
+      if (photo != null) {
+        final file = File(photo.path);
+        final bytes = await file.readAsBytes();
+        setState(() {
+          _imageFile = file;
+          _photoBase64 = base64Encode(bytes);
+        });
+      }
+    } catch (e) {
+      debugPrint('Pick image error: $e');
+    }
+  }
+
+  Future<void> _analyzeAndCatch() async {
+    if (_photoBase64 == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _loadingText = 'Membaca GPS Lokasi Anda...';
+    });
+
+    try {
+      // Baca lokasi GPS
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() => _isGettingLocation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Layanan lokasi dinonaktifkan. Aktifkan GPS Anda.')),
+        );
+        setState(() => _isLoading = false);
         return;
       }
+
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() => _isGettingLocation = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Izin GPS ditolak.')),
+          );
+          setState(() => _isLoading = false);
           return;
         }
       }
-      if (permission == LocationPermission.deniedForever) {
-        setState(() => _isGettingLocation = false);
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final double latitude = position.latitude;
+      final double longitude = position.longitude;
+
       setState(() {
-        _latController.text = position.latitude.toStringAsFixed(6);
-        _lngController.text = position.longitude.toStringAsFixed(6);
-        _isGettingLocation = false;
+        _loadingText = 'AI sedang menganalisis kucing...';
       });
-    } catch (_) {
-      setState(() => _isGettingLocation = false);
-    }
-  }
 
-  Future<void> _pickImage() async {
-    try {
-      final XFile? file = await _picker.pickImage(
-          source: ImageSource.gallery, imageQuality: 80);
-      if (file != null) setState(() => _imageFile = File(file.path));
-    } catch (_) {}
-  }
-
-  Future<void> _submit() async {
-    if (_imageFile == null) {
-      setState(() =>
-          _uploadError = 'Pilih foto kucing terlebih dahulu!');
-      return;
-    }
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isUploading = true;
-      _uploadError = null;
-      _uploadSuccess = null;
-    });
-    try {
       final token = context.read<AuthProvider>().token;
-      final formData = FormData.fromMap({
-        'custom_name': _nameController.text.trim(),
-        'breed': _breedController.text.trim(),
-        'color': _colorController.text.trim(),
-        'rarity': _selectedRarity,
-        'description': _descController.text.trim(),
-        'latitude': _latController.text.trim(),
-        'longitude': _lngController.text.trim(),
-        'photo': await MultipartFile.fromFile(_imageFile!.path,
-            filename: 'cat_photo.jpg'),
-      });
       final response = await _dio.post(
         '${ApiConfig.baseUrl}/api/cats/catch',
-        data: formData,
+        data: {
+          'photo': _photoBase64,
+          'latitude': latitude,
+          'longitude': longitude,
+        },
         options: Options(headers: {
           'Authorization': 'Bearer $token',
-          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json',
         }),
       );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        setState(() {
-          _uploadSuccess = 'Kucing berhasil ditambahkan! 🎉';
-          _isUploading = false;
-        });
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) Navigator.pop(context, true);
-      } else {
-        setState(() {
-          _uploadError =
-              'Gagal menambahkan kucing (${response.statusCode})';
-          _isUploading = false;
-        });
+
+      final newCat = response.data['cat'];
+
+      setState(() {
+        _isLoading = false;
+        _imageFile = null;
+        _photoBase64 = null;
+      });
+
+      // Buka DetailScreen dengan layout "TANGKAPAN BARU!"
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DetailScreen(cat: newCat, showWelcome: true),
+          ),
+        );
       }
-    } on DioException catch (e) {
-      setState(() {
-        _uploadError = e.response?.data?['message'] ??
-            e.response?.data?['error'] ??
-            'Upload gagal: ${e.message}';
-        _isUploading = false;
-      });
+
     } catch (e) {
-      setState(() {
-        _uploadError = 'Error: $e';
-        _isUploading = false;
-      });
+      debugPrint('AI Scan catch error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mendeteksi kucing. Pastikan objek terlihat jelas.')),
+      );
+      setState(() => _isLoading = false);
     }
   }
 
-  Color _rarityColor(String rarity) {
-    switch (rarity.toLowerCase()) {
-      case 'legendary':
-        return const Color(0xFFFF9800);
-      case 'epic':
-        return const Color(0xFF9C27B0);
-      case 'rare':
-        return const Color(0xFF2196F3);
-      case 'uncommon':
-        return const Color(0xFF4CAF50);
-      default:
-        return AppColors.textMuted;
-    }
+  void _reset() {
+    setState(() {
+      _imageFile = null;
+      _photoBase64 = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgCream,
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        title: Text('Tambah Kucing 🐱',
-            style: GoogleFonts.nunito(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Photo picker
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightGreen,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: AppColors.primaryGreen.withOpacity(0.5),
-                        width: 2),
-                  ),
-                  child: _imageFile != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: Image.file(_imageFile!,
-                              fit: BoxFit.cover,
-                              width: double.infinity),
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                                Icons.add_photo_alternate_outlined,
-                                color: AppColors.primaryGreen,
-                                size: 56),
-                            const SizedBox(height: 10),
-                            Text('Pilih foto kucing',
-                                style: GoogleFonts.nunito(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16)),
-                            Text('dari galeri',
-                                style: GoogleFonts.nunito(
-                                    color: AppColors.textMuted,
-                                    fontSize: 13)),
-                          ],
-                        ),
-                ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Background/Preview Area
+          if (_imageFile != null)
+            Positioned.fill(
+              child: Image.file(
+                _imageFile!,
+                fit: BoxFit.cover,
               ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton.icon(
-                  onPressed: _pickImage,
-                  icon: const Icon(Icons.photo_library,
-                      color: AppColors.primaryGreen),
-                  label: Text('Pilih dari Galeri',
+            )
+          else
+            Positioned.fill(
+              child: Container(
+                color: AppColors.bgCream,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.photo_camera_rounded, size: 70, color: AppColors.primaryGreen),
+                    const SizedBox(height: 15),
+                    Text(
+                      'AI MAIA Scanner',
                       style: GoogleFonts.nunito(
-                          color: AppColors.primaryGreen,
-                          fontWeight: FontWeight.w600)),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textBrown,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Potret kucing jalanan untuk analisis AI',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: _takePhoto,
+                      icon: const Icon(Icons.camera_alt, color: Colors.white),
+                      label: Text('BUKA KAMERA', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primaryGreen),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: _pickFromGallery,
+                      icon: const Icon(Icons.photo_library, color: AppColors.primaryGreen),
+                      label: Text('PILIH DARI GALERI', style: GoogleFonts.nunito(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
 
-              // Form fields
-              _buildLabel('Nama Kucing *'),
-              _buildTextField(
-                controller: _nameController,
-                hint: 'Contoh: Si Oyen',
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Nama wajib diisi' : null,
-              ),
-              const SizedBox(height: 14),
-
-              _buildLabel('Ras/Breed'),
-              _buildTextField(
-                  controller: _breedController,
-                  hint: 'Contoh: Domestic Shorthair'),
-              const SizedBox(height: 14),
-
-              _buildLabel('Warna'),
-              _buildTextField(
-                  controller: _colorController,
-                  hint: 'Contoh: Orange, Putih'),
-              const SizedBox(height: 14),
-
-              _buildLabel('Raritas *'),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+          // Top Header Instruction Overlay (Only in Preview)
+          if (_imageFile != null && !_isLoading)
+            Positioned(
+              top: 50,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.cardCream,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderCream),
+                  color: Colors.black.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedRarity,
-                    isExpanded: true,
-                    style: GoogleFonts.nunito(
-                        color: AppColors.textBrown, fontSize: 15),
-                    dropdownColor: AppColors.cardCream,
-                    items: _rarities
-                        .map((r) => DropdownMenuItem(
-                              value: r,
-                              child: Row(
-                                children: [
-                                  Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                          color: _rarityColor(r),
-                                          shape: BoxShape.circle)),
-                                  const SizedBox(width: 10),
-                                  Text(r,
-                                      style: GoogleFonts.nunito(
-                                          color: AppColors.textBrown,
-                                          fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _selectedRarity = v);
-                    },
-                  ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome, color: AppColors.primaryGreen, size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kucing Berhasil Terfoto!',
+                            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          Text(
+                            'Tekan Analisis untuk melihat tingkat kelangkaan dan statistiknya.',
+                            style: GoogleFonts.nunito(color: Colors.white70, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
+            ),
 
-              _buildLabel('Deskripsi'),
-              TextFormField(
-                controller: _descController,
-                maxLines: 3,
-                style: GoogleFonts.nunito(color: AppColors.textBrown),
-                decoration: InputDecoration(
-                  hintText: 'Ceritakan tentang kucing ini...',
-                  hintStyle:
-                      GoogleFonts.nunito(color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.cardCream,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.borderCream)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.borderCream)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppColors.primaryGreen, width: 2)),
-                  contentPadding: const EdgeInsets.all(14),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              _buildLabel('Lokasi'),
-              Row(
+          // Bottom Action Panel (Only in Preview)
+          if (_imageFile != null && !_isLoading)
+            Positioned(
+              bottom: 40,
+              left: 20,
+              right: 20,
+              child: Row(
                 children: [
                   Expanded(
-                    child: _buildTextField(
-                        controller: _latController,
-                        hint: 'Latitude',
-                        keyboardType: TextInputType.number),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.2),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: _reset,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: Text('ULANGI FOTO', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 11)),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _buildTextField(
-                        controller: _lngController,
-                        hint: 'Longitude',
-                        keyboardType: TextInputType.number),
-                  ),
-                  const SizedBox(width: 10),
-                  if (_isGettingLocation)
-                    const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                            color: AppColors.primaryGreen, strokeWidth: 2))
-                  else
-                    IconButton(
-                      onPressed: _getLocation,
-                      icon: const Icon(Icons.my_location,
-                          color: AppColors.primaryGreen),
-                      tooltip: 'Dapatkan lokasi',
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: _analyzeAndCatch,
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: Text('ANALISIS SEKARANG', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 11)),
                     ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
+            ),
 
-              if (_uploadError != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: AppColors.danger.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline,
-                          color: AppColors.danger, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: Text(_uploadError!,
-                              style: GoogleFonts.nunito(
-                                  color: AppColors.danger, fontSize: 13))),
-                    ],
-                  ),
-                ),
-
-              if (_uploadSuccess != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.lightGreen,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: AppColors.primaryGreen.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle,
-                          color: AppColors.primaryGreen, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: Text(_uploadSuccess!,
-                              style: GoogleFonts.nunito(
-                                  color: AppColors.primaryGreen,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13))),
-                    ],
-                  ),
-                ),
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    elevation: 2,
-                  ),
-                  onPressed: _isUploading ? null : _submit,
-                  child: _isUploading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : Text('Simpan Kucing 🐾',
-                          style: GoogleFonts.nunito(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17)),
+          // Loading Overlay
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primaryGreen),
+                    const SizedBox(height: 20),
+                    Text(
+                      _loadingText,
+                      style: GoogleFonts.nunito(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(text,
-          style: GoogleFonts.nunito(
-              color: AppColors.textBrown,
-              fontWeight: FontWeight.w700,
-              fontSize: 14)),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    String? hint,
-    String? Function(String?)? validator,
-    TextInputType? keyboardType,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      validator: validator,
-      style: GoogleFonts.nunito(color: AppColors.textBrown),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.nunito(color: AppColors.textMuted),
-        filled: true,
-        fillColor: AppColors.cardCream,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.borderCream)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.borderCream)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primaryGreen, width: 2)),
-        errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.danger)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+        ],
       ),
     );
   }

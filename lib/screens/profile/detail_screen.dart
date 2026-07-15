@@ -256,15 +256,15 @@ class _DetailScreenState extends State<DetailScreen> {
     final formattedDate = DateFormat('dd MMM yyyy', 'id_ID').format(parsedDate);
 
     final stats = _currentCat['stats'] as Map?;
-    final int cuteness = stats?['cuteness'] ?? 70;
-    final int playfulness = stats?['playfulness'] ?? 60;
-    final int energy = stats?['energy'] ?? 65;
+    final int cuteness = int.tryParse(stats?['cuteness']?.toString() ?? '') ?? 70;
+    final int playfulness = int.tryParse(stats?['playfulness']?.toString() ?? '') ?? 60;
+    final int energy = int.tryParse(stats?['energy']?.toString() ?? '') ?? 65;
 
     final double lat = double.tryParse(_currentCat['latitude']?.toString() ?? '') ?? 0.0;
     final double lng = double.tryParse(_currentCat['longitude']?.toString() ?? '') ?? 0.0;
 
-    final int level = _currentCat['level'] ?? 1;
-    final int xp = _currentCat['xp'] ?? 0;
+    final int level = int.tryParse(_currentCat['level']?.toString() ?? '') ?? 1;
+    final int xp = int.tryParse(_currentCat['xp']?.toString() ?? '') ?? 0;
     final int maxXp = level * 50;
 
     return Scaffold(
