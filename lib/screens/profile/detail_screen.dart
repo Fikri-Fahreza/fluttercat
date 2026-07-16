@@ -76,11 +76,11 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _playRaritySound() async {
     try {
       final rarity = (_currentCat['rarity'] ?? 'Common').toString().toLowerCase();
-      String url = 'https://github.com/joshwcomeau/use-sound/blob/master/example/public/sounds/meow.mp3?raw=true'; // Silas meow
+      String assetPath = 'sounds/meow.mp3';
       if (rarity == 'rare' || rarity == 'epic' || rarity == 'legendary') {
-        url = 'https://github.com/joshwcomeau/use-sound/blob/master/example/public/sounds/gliss.mp3?raw=true'; // Chime
+        assetPath = 'sounds/chime.mp3';
       }
-      await _audioPlayer.play(UrlSource(url));
+      await _audioPlayer.play(AssetSource(assetPath));
     } catch (e) {
       debugPrint('Audio play error: $e');
     }

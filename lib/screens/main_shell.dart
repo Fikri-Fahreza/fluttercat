@@ -18,6 +18,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   DateTime? _lastPressedAt;
+  final List<int> _history = [];
 
   final List<Widget> _screens = const [
     ProfileScreen(),
@@ -26,6 +27,15 @@ class _MainShellState extends State<MainShell> {
     ChatScreen(),
   ];
 
+  void _changeTab(int index) {
+    if (_currentIndex != index) {
+      setState(() {
+        _history.add(_currentIndex);
+        _currentIndex = index;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -33,13 +43,16 @@ class _MainShellState extends State<MainShell> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
-        // Jika tidak di tab pertama (Profile), kembalikan ke tab Profile dulu
-        if (_currentIndex != 0) {
-          setState(() => _currentIndex = 0);
+        // 1. Jika ada riwayat halaman sebelumnya, kembali ke halaman sebelumnya dulu
+        if (_history.isNotEmpty) {
+          final prevIndex = _history.removeLast();
+          setState(() {
+            _currentIndex = prevIndex;
+          });
           return;
         }
 
-        // Jika sudah di tab Profile, harus menekan tombol kembali 2x dalam 2 detik untuk keluar
+        // 2. Jika riwayat sudah kosong, tampilkan notifikasi "tekan sekali lagi"
         final now = DateTime.now();
         if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
           _lastPressedAt = now;
@@ -52,7 +65,7 @@ class _MainShellState extends State<MainShell> {
           return;
         }
 
-        // Keluar dari aplikasi secara bersih
+        // 3. Keluar dari aplikasi secara bersih
         await SystemNavigator.pop();
       },
       child: Scaffold(
@@ -95,7 +108,7 @@ class _MainShellState extends State<MainShell> {
   Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
     final isActive = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () => _changeTab(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
