@@ -54,6 +54,15 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     _currentCat = Map<String, dynamic>.from(widget.cat);
+    
+    // Ensure fallbacks for Map items
+    if (_currentCat['custom_name'] == null && _currentCat['name'] != null) {
+      _currentCat['custom_name'] = _currentCat['name'];
+    }
+    if (_currentCat['photo_path'] == null && _currentCat['photo'] != null) {
+      _currentCat['photo_path'] = _currentCat['photo'];
+    }
+
     _nameController = TextEditingController(text: _currentCat['custom_name'] ?? '');
     _breedController = TextEditingController(text: _currentCat['breed'] ?? '');
     _notesController = TextEditingController(text: _currentCat['notes'] ?? '');
@@ -67,9 +76,9 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _playRaritySound() async {
     try {
       final rarity = (_currentCat['rarity'] ?? 'Common').toString().toLowerCase();
-      String url = 'https://upload.wikimedia.org/wikipedia/commons/5/5c/Meow.ogg'; // Silas meow
+      String url = 'https://github.com/joshwcomeau/use-sound/blob/master/example/public/sounds/meow.mp3?raw=true'; // Silas meow
       if (rarity == 'rare' || rarity == 'epic' || rarity == 'legendary') {
-        url = 'https://upload.wikimedia.org/wikipedia/commons/5/5e/Airplane_Chime_Sound_Effect.ogg'; // Chime
+        url = 'https://github.com/joshwcomeau/use-sound/blob/master/example/public/sounds/gliss.mp3?raw=true'; // Chime
       }
       await _audioPlayer.play(UrlSource(url));
     } catch (e) {
@@ -470,6 +479,11 @@ class _DetailScreenState extends State<DetailScreen> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.volume_up, color: AppColors.primaryGreen, size: 22),
+                                        tooltip: 'Putar Suara Kelangkaan',
+                                        onPressed: _playRaritySound,
                                       ),
                                       IconButton(
                                         icon: Icon(_isFavorite ? Icons.star : Icons.star_border, color: const Color(0xFFF1C40F)),

@@ -403,6 +403,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _buildImageUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;
+    return '${ApiConfig.baseUrl}$path';
+  }
+
   Widget _buildChatRow(Map<String, dynamic> item, bool isGroup) {
     final name = item['name'] ?? 'Chat';
     final sub = isGroup ? 'Grup Chat' : '@${item['username']}';
@@ -410,10 +416,13 @@ class _ChatScreenState extends State<ChatScreen> {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: AppColors.lightGreen,
-        child: Text(
-          isGroup ? '👥' : '🐱',
-          style: const TextStyle(fontSize: 16),
-        ),
+        backgroundImage: (!isGroup && item['avatar'] != null) ? NetworkImage(_buildImageUrl(item['avatar'])) : null,
+        child: (isGroup || item['avatar'] == null)
+            ? Text(
+                isGroup ? '👥' : '🐱',
+                style: const TextStyle(fontSize: 16),
+              )
+            : null,
       ),
       title: Text(name, style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textBrown)),
       subtitle: Text(sub, style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted)),
@@ -437,6 +446,49 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       },
     );
+  }
+
+  Future<void> _confirmDeleteFriend(Map<String, dynamic> friend) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardCream,
+        title: Text('Hapus Pertemanan', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textBrown)),
+        content: Text('Yakin ingin menghapus ${friend['name']} dari daftar teman?', style: GoogleFonts.nunito(color: AppColors.textBrown)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal', style: GoogleFonts.nunito(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Hapus', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final friendshipId = friend['friendship_id'];
+        await _dio.delete(
+          '${ApiConfig.baseUrl}/api/friend-requests/$friendshipId/decline',
+          options: _authOptions,
+        );
+        setState(() {
+          _friends.removeWhere((f) => f['friendship_id'] == friendshipId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pertemanan berhasil dihapus.')),
+        );
+      } catch (e) {
+        debugPrint('Delete friend error: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menghapus pertemanan.')),
+        );
+      }
+    }
   }
 
   Widget _buildFriendsTab() {
@@ -475,23 +527,38 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final friend = _friends[index];
                     return ListTile(
-                      leading: const CircleAvatar(
+                      leading: CircleAvatar(
                         backgroundColor: AppColors.lightGreen,
-                        child: Text('🐱'),
+                        backgroundImage: (friend['avatar'] != null) ? NetworkImage(_buildImageUrl(friend['avatar'])) : null,
+                        child: (friend['avatar'] == null)
+                            ? Text(
+                                (friend['name'] ?? 'U').toString().substring(0, 1).toUpperCase(),
+                                style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
+                              )
+                            : null,
                       ),
                       title: Text(friend['name'] ?? '', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, color: AppColors.textBrown)),
                       subtitle: Text('@${friend['username'] ?? ''}', style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primaryGreen),
-                        onPressed: () {
-                          setState(() {
-                            _activeChatFriend = friend;
-                            _activeChatGroup = null;
-                            _messages = [];
-                          });
-                          _startPolling();
-                          _fetchMessages(friend['id'].toString());
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primaryGreen),
+                            onPressed: () {
+                              setState(() {
+                                _activeChatFriend = friend;
+                                _activeChatGroup = null;
+                                _messages = [];
+                              });
+                              _startPolling();
+                              _fetchMessages(friend['id'].toString());
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.person_remove_outlined, color: AppColors.danger),
+                            onPressed: () => _confirmDeleteFriend(friend),
+                          ),
+                        ],
                       ),
                     );
                   },

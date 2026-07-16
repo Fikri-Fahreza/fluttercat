@@ -88,6 +88,8 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.read<AuthProvider>().user;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -107,22 +109,53 @@ class _MapScreenState extends State<MapScreen> {
                 userAgentPackageName: 'com.fikri.pawfinder',
               ),
 
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: _currentLocation,
+                    radius: 150, // 150 meter radius
+                    useRadiusInMeter: true,
+                    color: AppColors.primaryGreen.withOpacity(0.12),
+                    borderColor: AppColors.primaryGreen.withOpacity(0.35),
+                    borderStrokeWidth: 2,
+                  ),
+                ],
+              ),
+
               // Markers
               MarkerLayer(
                 markers: [
                   // User Location Pin
                   Marker(
                     point: _currentLocation,
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withOpacity(0.2),
+                        color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primaryGreen.withOpacity(0.4),
+                            blurRadius: 10,
+                            spreadRadius: 3,
+                          ),
+                        ],
+                        border: Border.all(color: AppColors.primaryGreen, width: 3),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.my_location, color: AppColors.primaryGreen, size: 20),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(25),
+                        child: currentUser?['avatar'] != null
+                            ? Image.network(
+                                _buildImageUrl(currentUser?['avatar']),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(Icons.person, color: AppColors.primaryGreen, size: 24),
+                                ),
+                              )
+                            : const Center(
+                                child: Icon(Icons.person, color: AppColors.primaryGreen, size: 24),
+                              ),
                       ),
                     ),
                   ),

@@ -136,10 +136,15 @@ class _FeedScreenState extends State<FeedScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Postingan berhasil dihapus.')),
         );
-      } catch (e) {
-        debugPrint('Delete post error: $e');
+      } on DioException catch (e) {
+        final errorMsg = e.response?.data['message'] ?? e.message ?? 'Gagal menghapus postingan';
+        final status = e.response?.statusCode;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal menghapus postingan.')),
+          SnackBar(content: Text('$errorMsg (Status: $status)')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal: $e')),
         );
       }
     }
