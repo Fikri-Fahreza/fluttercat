@@ -534,20 +534,29 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildEmptyState(String title, String sub) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            const Text('💬', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 10),
-            Text(title, style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textBrown)),
-            const SizedBox(height: 4),
-            Text(sub, style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted), textAlign: TextAlign.center),
+            Container(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('💬', style: TextStyle(fontSize: 48)),
+                  const SizedBox(height: 10),
+                  Text(title, style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textBrown)),
+                  const SizedBox(height: 4),
+                  Text(sub, style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted), textAlign: TextAlign.center),
+                ],
+              ),
+            ),
           ],
-        ),
-      ),
+        );
+      }
     );
   }
 

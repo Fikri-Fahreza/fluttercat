@@ -210,54 +210,61 @@ class _CatDexScreenState extends State<CatDexScreen> {
                         ],
                       ),
                     )
-                  : filtered.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(30),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text('😿', style: TextStyle(fontSize: 50)),
-                                const SizedBox(height: 10),
-                                Text(
-                                  'Tidak ada kucing ditemukan!',
-                                  style: GoogleFonts.nunito(
-                                    color: AppColors.textBrown,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
+                  : RefreshIndicator(
+                      color: AppColors.primaryGreen,
+                      onRefresh: _onRefresh,
+                      child: filtered.isEmpty
+                          ? LayoutBuilder(
+                              builder: (context, constraints) => ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  Container(
+                                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.all(30),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Text('😿', style: TextStyle(fontSize: 50)),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          'Tidak ada kucing ditemukan!',
+                                          style: GoogleFonts.nunito(
+                                            color: AppColors.textBrown,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Coba ubah filter pencarian Anda atau potret kucing baru.',
+                                          style: GoogleFonts.nunito(
+                                            color: AppColors.textMuted,
+                                            fontSize: 12,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Coba ubah filter pencarian Anda atau potret kucing baru.',
-                                  style: GoogleFonts.nunito(
-                                    color: AppColors.textMuted,
-                                    fontSize: 12,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                                ],
+                              ),
+                            )
+                          : GridView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 15),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.78,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                              ),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                final cat = filtered[index];
+                                return _buildCatCard(cat);
+                              },
                             ),
-                          ),
-                        )
-                      : RefreshIndicator(
-                          color: AppColors.primaryGreen,
-                          onRefresh: _onRefresh,
-                          child: GridView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 15),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.78,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final cat = filtered[index];
-                              return _buildCatCard(cat);
-                            },
-                          ),
-                        ),
+                    ),
             ),
           ],
         ),
