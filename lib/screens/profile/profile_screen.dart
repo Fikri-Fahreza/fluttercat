@@ -14,6 +14,7 @@ import 'leaderboard_screen.dart';
 import 'achievements_screen.dart';
 import 'encyclopedia_screen.dart';
 import 'gift_inbox_screen.dart';
+import '../map/map_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -343,6 +344,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 25),
+
+                    // Premium Map Banner
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen())),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGreen.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.primaryGreen.withOpacity(0.3), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primaryGreen,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Peta Kucing Terdekat 🗺️',
+                                    style: GoogleFonts.nunito(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: AppColors.textBrown,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Pantau persebaran kucing liar dari komunitas',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 11,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primaryGreen),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
 
                     // Navigation Grid Menu
                     GridView.count(

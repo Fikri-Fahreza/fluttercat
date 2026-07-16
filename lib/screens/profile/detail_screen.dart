@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../config/api_config.dart';
@@ -46,6 +48,7 @@ class _DetailScreenState extends State<DetailScreen> {
   bool _showDeleteModal = false;
   final TextEditingController _deletePasswordController = TextEditingController();
   bool _isDeleting = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -56,6 +59,22 @@ class _DetailScreenState extends State<DetailScreen> {
     _notesController = TextEditingController(text: _currentCat['notes'] ?? '');
     _isFavorite = _currentCat['is_favorite'] == 1 || _currentCat['is_favorite'] == true;
     _fetchAddress();
+    if (widget.showWelcome) {
+      _playRaritySound();
+    }
+  }
+
+  Future<void> _playRaritySound() async {
+    try {
+      final rarity = (_currentCat['rarity'] ?? 'Common').toString().toLowerCase();
+      String url = 'https://upload.wikimedia.org/wikipedia/commons/5/5c/Meow.ogg'; // Silas meow
+      if (rarity == 'rare' || rarity == 'epic' || rarity == 'legendary') {
+        url = 'https://upload.wikimedia.org/wikipedia/commons/5/5e/Airplane_Chime_Sound_Effect.ogg'; // Chime
+      }
+      await _audioPlayer.play(UrlSource(url));
+    } catch (e) {
+      debugPrint('Audio play error: $e');
+    }
   }
 
   @override
@@ -65,6 +84,7 @@ class _DetailScreenState extends State<DetailScreen> {
     _notesController.dispose();
     _giftMsgController.dispose();
     _deletePasswordController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -340,6 +360,53 @@ class _DetailScreenState extends State<DetailScreen> {
                                 ),
                               ),
                             ),
+                            if (widget.showWelcome)
+                              Positioned.fill(
+                                child: Stack(
+                                  children: [
+                                    // Moving green scanning laser line
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [Colors.transparent, AppColors.primaryGreen.withOpacity(0.5), Colors.transparent],
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                        ),
+                                      ),
+                                    )
+                                    .animate(onPlay: (controller) => controller.repeat())
+                                    .moveY(
+                                      begin: 0,
+                                      end: 240,
+                                      duration: 2.seconds,
+                                      curve: Curves.easeInOut,
+                                    ),
+                                    
+                                    // AR Corner Bracket Borders
+                                    Positioned(
+                                      top: 10, left: 10,
+                                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white, width: 3), left: BorderSide(color: Colors.white, width: 3)))),
+                                    ),
+                                    Positioned(
+                                      top: 10, right: 10,
+                                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white, width: 3), right: BorderSide(color: Colors.white, width: 3)))),
+                                    ),
+                                    Positioned(
+                                      bottom: 10, left: 10,
+                                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white, width: 3), left: BorderSide(color: Colors.white, width: 3)))),
+                                    ),
+                                    Positioned(
+                                      bottom: 10, right: 10,
+                                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white, width: 3), right: BorderSide(color: Colors.white, width: 3)))),
+                                    ),
+                                    
+                                    // AR Scanner Target Crosshair
+                                    const Center(
+                                      child: Icon(Icons.center_focus_weak, color: Colors.white70, size: 48),
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),
